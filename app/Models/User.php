@@ -66,7 +66,7 @@ class User extends Authenticatable {
         'currency_id' => 'required|exists:currencies,id',
         'language' => 'required|in:en,ar',
         'name' => 'required|min:4',
-        //'email' => 'required|email|unique:users,email',
+        'email' => 'required|email|unique:users,email',
         'mobile' => 'required|mobile',
         'image' => 'nullable|image|max:5000'
     ];

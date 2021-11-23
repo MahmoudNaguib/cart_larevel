@@ -32,12 +32,21 @@ class LoggedProfileController extends Controller {
 
     public function postEdit() {
         $row = \App\Models\User::findOrFail(auth()->user()->id);
-       // $this->editProfileRules['email'] .= ',' . $row->id . ',id,deleted_at,NULL';
+        $this->editProfileRules['email'] .= ',' . $row->id . ',id,deleted_at,NULL';
         $validator = Validator::make(request()->all(), $this->editProfileRules);
         if ($validator->fails()) {
             return response()->json(transformValidation($validator->errors()->messages()), 422);
         }
+        $oldEmail=$row->email;
+        $oldName=$row->name;
         if ($row->update(request()->except(['password']))) {
+            ////////////////////// Update token if email or name changed
+            if($oldName!=request('name') || $oldEmail!=request('email')){
+                $row->token=generateToken(request('email'));
+                $row->save();
+                request()->headers->set('Authorization','Bearer '. $row->token);
+            }
+            //////////////////////
             return response()->json([
                 'message' => trans('app.Edit successfully'),
                 'data' => new \App\Http\Resources\UserResource($this->model->includes()->findOrFail($row->id))
@@ -52,13 +61,15 @@ class LoggedProfileController extends Controller {
         if ($validator->fails()) {
             return response()->json(transformValidation($validator->errors()->messages()), 422);
         }
-        ////////////////////////////// refresh the token
-        $hash = md5(time()) . md5($row->email) . md5(RandomString(10));
-        request()->request->add([
-            'token'=>$hash,
-        ]);
+        ////////////////////// Update token if email or name changed
+        if (!Hash::check(trim(request('password')), $row->password)) {
+            request()->request->add([
+                'token'=>generateToken(request('email')),
+            ]);
+        }
+        //////////////////////
         if ($row->update(request()->only(['password','token']))) {
-            request()->headers->set('Authorization','Bearer '. $hash);
+            request()->headers->set('Authorization','Bearer '. $row->token);
             return response()->json([
                 'message' => trans('app.Password changed successfully'),
                 'data' => new \App\Http\Resources\UserResource($this->model->includes()->findOrFail($row->id))
